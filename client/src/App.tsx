@@ -1,29 +1,78 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { FormEvent } from 'react'
 import './App.css'
+import Login from './Login'
+import { apiRequest } from './api'
 
 type Application = {
-  id: number
+  id: string
   company: string
   position: string
-  location: string
+  location: string | null
   status: 'Saved' | 'Applied' | 'Interview' | 'Offer' | 'Rejected'
 }
 
-const initialApplications: Application[] = [
-  { id: 1, company: 'Sakura Systems', position: 'Software Engineer', location: 'Tokyo, Japan', status: 'Applied' },
-  { id: 2, company: 'Nippon Digital', position: 'Frontend Developer', location: 'Osaka, Japan', status: 'Interview' },
-  { id: 3, company: 'Tokyo Tech Labs', position: 'Backend Developer', location: 'Tokyo, Japan', status: 'Saved' },
-]
-
 function App() {
-  const [applications, setApplications] = useState(initialApplications)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+  const [applications, setApplications] = useState<Application[]>([])
+  const [loadingApplications, setLoadingApplications] = useState(false)
+  const [error, setError] = useState('')
+
   const [showForm, setShowForm] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [company, setCompany] = useState('')
   const [position, setPosition] = useState('')
   const [location, setLocation] = useState('Tokyo, Japan')
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
+
+  // Restore the user's login session when the app opens.
+  useEffect(() => {
+    let active = true
+
+    apiRequest('/auth/me')
+      .then(() => {
+        if (active) setIsAuthenticated(true)
+      })
+      .catch(() => {
+        if (active) setIsAuthenticated(false)
+      })
+      .finally(() => {
+        if (active) setCheckingSession(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  // Load applications from PostgreSQL after authentication.
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    let active = true
+
+    setLoadingApplications(true)
+    setError('')
+
+    apiRequest<{ applications: Application[] }>('/applications')
+      .then((data) => {
+        if (active) setApplications(data.applications)
+      })
+      .catch((err) => {
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load applications.')
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingApplications(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [isAuthenticated])
 
   const resetForm = () => {
     setCompany('')
@@ -42,56 +91,112 @@ function App() {
   const openEditForm = (application: Application) => {
     setCompany(application.company)
     setPosition(application.position)
-    setLocation(application.location)
+    setLocation(application.location ?? '')
     setStatus(application.status)
     setEditingId(application.id)
     setShowForm(true)
   }
 
-  const saveApplication = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveApplication = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
     if (!company.trim() || !position.trim()) return
 
-    if (editingId !== null) {
-      setApplications((current) =>
-        current.map((application) =>
-          application.id === editingId
-            ? { ...application, company: company.trim(), position: position.trim(), location: location.trim(), status }
-            : application,
-        ),
-      )
-    } else {
-      const newApplication: Application = {
-        id: Date.now(),
-        company: company.trim(),
-        position: position.trim(),
-        location: location.trim(),
-        status,
-      }
-      setApplications((current) => [newApplication, ...current])
+    setError('')
+
+    const applicationData = {
+      company: company.trim(),
+      position: position.trim(),
+      location: location.trim() || null,
+      status,
     }
 
-    resetForm()
+    try {
+      if (editingId !== null) {
+        const data = await apiRequest<{ application: Application }>(
+          `/applications/${editingId}`,
+          {
+            method: 'PUT',
+            body: JSON.stringify(applicationData),
+          }
+        )
+
+        setApplications((current) =>
+          current.map((application) =>
+            application.id === editingId ? data.application : application
+          )
+        )
+      } else {
+        const data = await apiRequest<{ application: Application }>(
+          '/applications',
+          {
+            method: 'POST',
+            body: JSON.stringify(applicationData),
+          }
+        )
+
+        setApplications((current) => [data.application, ...current])
+      }
+
+      resetForm()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save application.')
+    }
   }
 
-  const deleteApplication = (id: number) => {
-    const confirmed = window.confirm('Are you sure you want to delete this application?')
+  const deleteApplication = async (id: string) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to delete this application?'
+    )
+
     if (!confirmed) return
 
-    setApplications((current) =>
-      current.filter((application) => application.id !== id),
-    )
+    setError('')
+
+    try {
+      await apiRequest(`/applications/${id}`, {
+        method: 'DELETE',
+      })
+
+      setApplications((current) =>
+        current.filter((application) => application.id !== id)
+      )
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete application.')
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await apiRequest('/auth/logout', {
+        method: 'POST',
+      })
+
+      setApplications([])
+      setIsAuthenticated(false)
+      setError('')
+      resetForm()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to log out.')
+    }
   }
 
   const filteredApplications = applications.filter((application) =>
-    `${application.company} ${application.position} ${application.location}`
+    `${application.company} ${application.position} ${application.location ?? ''}`
       .toLowerCase()
-      .includes(search.toLowerCase()),
+      .includes(search.toLowerCase())
   )
 
   const countByStatus = (value: Application['status']) =>
     applications.filter((application) => application.status === value).length
+
+  if (checkingSession) {
+    return <div className="login-page">Checking your session...</div>
+  }
+
+  if (!isAuthenticated) {
+    return <Login onLogin={() => setIsAuthenticated(true)} />
+  }
 
   return (
     <div className="app-shell">
@@ -125,6 +230,9 @@ function App() {
           <div className="topbar-right">
             <span className="status-dot" />
             Job search active
+            <button className="action-button" onClick={handleLogout}>
+              Log out
+            </button>
           </div>
         </header>
 
@@ -132,32 +240,63 @@ function App() {
           <div>
             <p className="eyebrow">YOUR CAREER JOURNEY</p>
             <h1>Dashboard</h1>
-            <p className="subtitle">Keep track of your journey toward a career in Japan.</p>
+            <p className="subtitle">
+              Keep track of your journey toward a career in Japan.
+            </p>
           </div>
           <button className="primary-button" onClick={openAddForm}>
             + Add application
           </button>
         </section>
 
+        {error && (
+          <div className="api-error" role="alert">
+            {error}
+          </div>
+        )}
+
         {showForm && (
           <form className="application-form" onSubmit={saveApplication}>
             <h2>{editingId !== null ? 'Edit application' : 'New application'}</h2>
+
             <div className="form-grid">
               <label>
                 Company
-                <input value={company} onChange={(event) => setCompany(event.target.value)} placeholder="e.g. Sony" required />
+                <input
+                  value={company}
+                  onChange={(event) => setCompany(event.target.value)}
+                  placeholder="e.g. Sony"
+                  required
+                />
               </label>
+
               <label>
                 Position
-                <input value={position} onChange={(event) => setPosition(event.target.value)} placeholder="e.g. Software Engineer" required />
+                <input
+                  value={position}
+                  onChange={(event) => setPosition(event.target.value)}
+                  placeholder="e.g. Software Engineer"
+                  required
+                />
               </label>
+
               <label>
                 Location
-                <input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Tokyo, Japan" />
+                <input
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  placeholder="Tokyo, Japan"
+                />
               </label>
+
               <label>
                 Status
-                <select value={status} onChange={(event) => setStatus(event.target.value as Application['status'])}>
+                <select
+                  value={status}
+                  onChange={(event) =>
+                    setStatus(event.target.value as Application['status'])
+                  }
+                >
                   <option>Saved</option>
                   <option>Applied</option>
                   <option>Interview</option>
@@ -166,8 +305,11 @@ function App() {
                 </select>
               </label>
             </div>
+
             <div className="form-actions">
-              <button type="button" className="secondary-button" onClick={resetForm}>Cancel</button>
+              <button type="button" className="secondary-button" onClick={resetForm}>
+                Cancel
+              </button>
               <button type="submit" className="primary-button">
                 {editingId !== null ? 'Save changes' : 'Save application'}
               </button>
@@ -181,16 +323,19 @@ function App() {
             <strong>{applications.length}</strong>
             <small>Companies tracked</small>
           </div>
+
           <div className="stat-card">
             <div className="stat-top"><span>Interviews</span><span>◉</span></div>
             <strong>{countByStatus('Interview')}</strong>
             <small>Interview opportunities</small>
           </div>
+
           <div className="stat-card">
             <div className="stat-top"><span>Offers</span><span>✧</span></div>
             <strong>{countByStatus('Offer')}</strong>
             <small>Potential opportunities</small>
           </div>
+
           <div className="stat-card">
             <div className="stat-top"><span>Applications pending</span><span>◷</span></div>
             <strong>{countByStatus('Applied')}</strong>
@@ -204,6 +349,7 @@ function App() {
               <h2>Recent applications</h2>
               <p>Your tracked opportunities in Japan.</p>
             </div>
+
             <input
               className="search-input"
               value={search}
@@ -223,35 +369,66 @@ function App() {
                   <th>ACTIONS</th>
                 </tr>
               </thead>
+
               <tbody>
                 {filteredApplications.map((application) => (
                   <tr key={application.id}>
                     <td className="company-cell">
-                      <div className="company-avatar">{application.company.charAt(0).toUpperCase()}</div>
+                      <div className="company-avatar">
+                        {application.company.charAt(0).toUpperCase()}
+                      </div>
                       {application.company}
                     </td>
+
                     <td>{application.position}</td>
-                    <td>{application.location}</td>
+                    <td>{application.location || '—'}</td>
+
                     <td>
                       <span className={`status-badge ${application.status.toLowerCase()}`}>
                         {application.status}
                       </span>
                     </td>
+
                     <td className="actions-cell">
-                      <button className="action-button" onClick={() => openEditForm(application)}>Edit</button>
-                      <button className="action-button delete-button" onClick={() => deleteApplication(application.id)}>Delete</button>
+                      <button
+                        className="action-button"
+                        onClick={() => openEditForm(application)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="action-button delete-button"
+                        onClick={() => deleteApplication(application.id)}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
-                {filteredApplications.length === 0 && (
-                  <tr><td colSpan={5} className="empty-state">No applications found.</td></tr>
+
+                {!loadingApplications && filteredApplications.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="empty-state">
+                      No applications found.
+                    </td>
+                  </tr>
+                )}
+
+                {loadingApplications && (
+                  <tr>
+                    <td colSpan={5} className="empty-state">
+                      Loading applications...
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
         </section>
 
-        <footer>Japan Career Tracker <span>Built to make your next move happen.</span></footer>
+        <footer>
+          Japan Career Tracker <span>Built to make your next move happen.</span>
+        </footer>
       </main>
     </div>
   )
