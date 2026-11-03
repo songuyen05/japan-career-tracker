@@ -5,6 +5,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import pool from "./config/db.js";
 import authRouter from "./routes/auth.js";
+import applicationsRouter from "./routes/applications.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,8 @@ app.use(
 );
 
 app.use("/api/auth", authRouter);
+
+app.use("/api/applications", applicationsRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({

@@ -1,0 +1,269 @@
+import { Router } from "express";
+import pool from "../config/db.js";
+import { requireAuth } from "../middleware/requireAuth.js";
+
+const router = Router();
+
+// Require login for every route in this file.
+router.use(requireAuth);
+
+// GET ALL APPLICATIONS
+router.get("/", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT *
+       FROM applications
+       WHERE user_id = $1
+       ORDER BY created_at DESC`,
+      [req.session.userId]
+    );
+
+    return res.json({
+      applications: result.rows,
+    });
+  } catch (error) {
+    console.error("Fetch applications error:", error);
+
+    return res.status(500).json({
+      message: "Unable to retrieve applications.",
+    });
+  }
+});
+
+// CREATE APPLICATION
+router.post("/", async (req, res) => {
+  try {
+    const {
+      company,
+      position,
+      location,
+      salary_min,
+      salary_max,
+      salary_currency,
+      job_url,
+      status,
+      deadline,
+      applied_at,
+      notes,
+    } = req.body;
+
+    if (
+      typeof company !== "string" ||
+      !company.trim() ||
+      typeof position !== "string" ||
+      !position.trim()
+    ) {
+      return res.status(400).json({
+        message: "Company and position are required.",
+      });
+    }
+
+    const validStatuses = [
+      "Saved",
+      "Applied",
+      "Interview",
+      "Offer",
+      "Rejected",
+    ];
+
+    const applicationStatus = status ?? "Saved";
+
+    if (!validStatuses.includes(applicationStatus)) {
+      return res.status(400).json({
+        message: "Invalid application status.",
+      });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO applications (
+        user_id, company, position, location,
+        salary_min, salary_max, salary_currency,
+        job_url, status, deadline, applied_at, notes
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+      )
+      RETURNING *`,
+      [
+        req.session.userId,
+        company.trim(),
+        position.trim(),
+        location ?? null,
+        salary_min ?? null,
+        salary_max ?? null,
+        salary_currency ?? "JPY",
+        job_url ?? null,
+        applicationStatus,
+        deadline ?? null,
+        applied_at ?? null,
+        notes ?? null,
+      ]
+    );
+
+    return res.status(201).json({
+      message: "Application created successfully.",
+      application: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Create application error:", error);
+
+    return res.status(500).json({
+      message: "Unable to create application.",
+    });
+  }
+});
+
+// GET ONE APPLICATION
+router.get("/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT *
+       FROM applications
+       WHERE id = $1 AND user_id = $2`,
+      [req.params.id, req.session.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Application not found.",
+      });
+    }
+
+    return res.json({
+      application: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Fetch application error:", error);
+
+    return res.status(500).json({
+      message: "Unable to retrieve application.",
+    });
+  }
+});
+
+// UPDATE APPLICATION
+router.put("/:id", async (req, res) => {
+  try {
+    const {
+      company,
+      position,
+      location,
+      salary_min,
+      salary_max,
+      salary_currency,
+      job_url,
+      status,
+      deadline,
+      applied_at,
+      notes,
+    } = req.body;
+
+    const validStatuses = [
+      "Saved",
+      "Applied",
+      "Interview",
+      "Offer",
+      "Rejected",
+    ];
+
+    if (
+      (company !== undefined &&
+        (typeof company !== "string" || !company.trim())) ||
+      (position !== undefined &&
+        (typeof position !== "string" || !position.trim()))
+    ) {
+      return res.status(400).json({
+        message: "Company and position cannot be empty.",
+      });
+    }
+
+    if (
+      status !== undefined &&
+      (typeof status !== "string" || !validStatuses.includes(status))
+    ) {
+      return res.status(400).json({
+        message: "Invalid application status.",
+      });
+    }
+
+    const result = await pool.query(
+      `UPDATE applications SET
+        company = COALESCE($1, company),
+        position = COALESCE($2, position),
+        location = COALESCE($3, location),
+        salary_min = COALESCE($4, salary_min),
+        salary_max = COALESCE($5, salary_max),
+        salary_currency = COALESCE($6, salary_currency),
+        job_url = COALESCE($7, job_url),
+        status = COALESCE($8, status),
+        deadline = COALESCE($9, deadline),
+        applied_at = COALESCE($10, applied_at),
+        notes = COALESCE($11, notes),
+        updated_at = NOW()
+      WHERE id = $12 AND user_id = $13
+      RETURNING *`,
+      [
+        company?.trim(),
+        position?.trim(),
+        location,
+        salary_min,
+        salary_max,
+        salary_currency,
+        job_url,
+        status,
+        deadline,
+        applied_at,
+        notes,
+        req.params.id,
+        req.session.userId,
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Application not found.",
+      });
+    }
+
+    return res.json({
+      message: "Application updated successfully.",
+      application: result.rows[0],
+    });
+  } catch (error) {
+    console.error("Update application error:", error);
+
+    return res.status(500).json({
+      message: "Unable to update application.",
+    });
+  }
+});
+
+// DELETE APPLICATION
+router.delete("/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `DELETE FROM applications
+       WHERE id = $1 AND user_id = $2
+       RETURNING id`,
+      [req.params.id, req.session.userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: "Application not found.",
+      });
+    }
+
+    return res.json({
+      message: "Application deleted successfully.",
+    });
+  } catch (error) {
+    console.error("Delete application error:", error);
+
+    return res.status(500).json({
+      message: "Unable to delete application.",
+    });
+  }
+});
+
+export default router;
