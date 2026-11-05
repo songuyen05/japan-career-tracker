@@ -10,6 +10,13 @@ type Application = {
   position: string
   location: string | null
   status: 'Saved' | 'Applied' | 'Interview' | 'Offer' | 'Rejected'
+  salary_min: number | string | null
+  salary_max: number | string | null
+  salary_currency: string
+  job_url: string | null
+  deadline: string | null
+  applied_at: string | null
+  notes: string | null
 }
 
 function App() {
@@ -26,6 +33,14 @@ function App() {
   const [location, setLocation] = useState('Tokyo, Japan')
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
+
+  const [salaryMin, setSalaryMin] = useState('')
+  const [salaryMax, setSalaryMax] = useState('')
+  const [salaryCurrency, setSalaryCurrency] = useState('JPY')
+  const [jobUrl, setJobUrl] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [appliedAt, setAppliedAt] = useState('')
+  const [notes, setNotes] = useState('')  
 
   // Restore the user's login session when the app opens.
   useEffect(() => {
@@ -81,6 +96,13 @@ function App() {
     setStatus('Saved')
     setEditingId(null)
     setShowForm(false)
+    setSalaryMin('')
+    setSalaryMax('')
+    setSalaryCurrency('JPY')
+    setJobUrl('')
+    setDeadline('')
+    setAppliedAt('')
+    setNotes('')
   }
 
   const openAddForm = () => {
@@ -95,6 +117,13 @@ function App() {
     setStatus(application.status)
     setEditingId(application.id)
     setShowForm(true)
+    setSalaryMin(application.salary_min?.toString() ?? '')
+    setSalaryMax(application.salary_max?.toString() ?? '')
+    setSalaryCurrency(application.salary_currency || 'JPY')
+    setJobUrl(application.job_url ?? '')
+    setDeadline(application.deadline?.slice(0, 10) ?? '')
+    setAppliedAt(application.applied_at?.slice(0, 10) ?? '')
+    setNotes(application.notes ?? '')
   }
 
   const saveApplication = async (event: FormEvent<HTMLFormElement>) => {
@@ -109,6 +138,13 @@ function App() {
       position: position.trim(),
       location: location.trim() || null,
       status,
+      salary_min: salaryMin ? Number(salaryMin) : null,
+      salary_max: salaryMax ? Number(salaryMax) : null,
+      salary_currency: salaryCurrency,
+      job_url: jobUrl.trim() || null,
+      deadline: deadline || null,
+      applied_at: appliedAt || null,
+      notes: notes.trim() || null,
     }
 
     try {
@@ -255,6 +291,7 @@ function App() {
           </div>
         )}
 
+        
         {showForm && (
           <form className="application-form" onSubmit={saveApplication}>
             <h2>{editingId !== null ? 'Edit application' : 'New application'}</h2>
@@ -304,6 +341,78 @@ function App() {
                   <option>Rejected</option>
                 </select>
               </label>
+
+              <label>
+                Minimum salary
+                <input
+                  type="number"
+                  min="0"
+                  value={salaryMin}
+                  onChange={(event) => setSalaryMin(event.target.value)}
+                  placeholder="5000000"
+                />
+              </label>
+
+              <label>
+                Maximum salary
+                <input
+                  type="number"
+                  min="0"
+                  value={salaryMax}
+                  onChange={(event) => setSalaryMax(event.target.value)}
+                  placeholder="7000000"
+                />
+              </label>
+
+              <label>
+                Salary currency
+                <select
+                  value={salaryCurrency}
+                  onChange={(event) => setSalaryCurrency(event.target.value)}
+                >
+                  <option value="JPY">JPY (¥)</option>
+                  <option value="USD">USD ($)</option>
+                  <option value="EUR">EUR (€)</option>
+                </select>
+              </label>
+
+              <label>
+                Job posting URL
+                <input
+                  type="url"
+                  value={jobUrl}
+                  onChange={(event) => setJobUrl(event.target.value)}
+                  placeholder="https://company.com/jobs/123"
+                />
+              </label>
+
+              <label>
+                Application deadline
+                <input
+                  type="date"
+                  value={deadline}
+                  onChange={(event) => setDeadline(event.target.value)}
+                />
+              </label>
+
+              <label>
+                Date applied
+                <input
+                  type="date"
+                  value={appliedAt}
+                  onChange={(event) => setAppliedAt(event.target.value)}
+                />
+              </label>
+
+              <label>
+                Notes
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  placeholder="Interview details, requirements, contact information..."
+                  rows={3}
+                />
+              </label>
             </div>
 
             <div className="form-actions">
@@ -316,6 +425,7 @@ function App() {
             </div>
           </form>
         )}
+
 
         <section className="stats-grid">
           <div className="stat-card">
