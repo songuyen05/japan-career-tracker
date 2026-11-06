@@ -45,6 +45,38 @@ function formatSalaryRange(application: Application): string {
   return minimum || maximum || '—'
 }
 
+function formatDeadline(deadline: string | null): string {
+  if (!deadline) return '—'
+
+  const [year, month, day] = deadline.slice(0, 10).split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+function getDeadlineStatus(deadline: string | null): string {
+  if (!deadline) return ''
+
+  const [year, month, day] = deadline.slice(0, 10).split('-').map(Number)
+  const dueDate = new Date(year, month - 1, day)
+  const today = new Date()
+
+  today.setHours(0, 0, 0, 0)
+
+  const daysRemaining = Math.ceil(
+    (dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  )
+
+  if (daysRemaining < 0) return 'overdue'
+  if (daysRemaining <= 7) return 'due-soon'
+
+  return 'upcoming'
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
@@ -502,6 +534,7 @@ function App() {
                   <th>POSITION</th>
                   <th>LOCATION</th>
                   <th>SALARY</th>
+                  <th>DEADLINE</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -520,6 +553,15 @@ function App() {
                     <td>{application.position}</td>
                     <td>{application.location || '—'}</td>
                     <td>{formatSalaryRange(application)}</td>
+                    <td>
+                      {application.deadline ? (
+                        <span className={`deadline-badge ${getDeadlineStatus(application.deadline)}`}>
+                          {formatDeadline(application.deadline)}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
 
                     <td>
                       <span className={`status-badge ${application.status.toLowerCase()}`}>
@@ -546,7 +588,7 @@ function App() {
 
                 {!loadingApplications && filteredApplications.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="empty-state">
+                    <td colSpan={7} className="empty-state">
                       No applications found.
                     </td>
                   </tr>
@@ -554,7 +596,7 @@ function App() {
 
                 {loadingApplications && (
                   <tr>
-                    <td colSpan={6} className="empty-state">
+                    <td colSpan={7} className="empty-state">
                       Loading applications...
                     </td>
                   </tr>
