@@ -19,6 +19,32 @@ type Application = {
   notes: string | null
 }
 
+function formatSalaryRange(application: Application): string {
+  const { salary_min, salary_max, salary_currency } = application
+
+  if (salary_min === null && salary_max === null) {
+    return '—'
+  }
+
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: salary_currency || 'JPY',
+    maximumFractionDigits: 0,
+  })
+
+  const minimum =
+    salary_min !== null ? formatter.format(Number(salary_min)) : null
+
+  const maximum =
+    salary_max !== null ? formatter.format(Number(salary_max)) : null
+
+  if (minimum && maximum) {
+    return `${minimum} – ${maximum}`
+  }
+
+  return minimum || maximum || '—'
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
@@ -475,6 +501,7 @@ function App() {
                   <th>COMPANY</th>
                   <th>POSITION</th>
                   <th>LOCATION</th>
+                  <th>SALARY</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -492,6 +519,7 @@ function App() {
 
                     <td>{application.position}</td>
                     <td>{application.location || '—'}</td>
+                    <td>{formatSalaryRange(application)}</td>
 
                     <td>
                       <span className={`status-badge ${application.status.toLowerCase()}`}>
@@ -518,7 +546,7 @@ function App() {
 
                 {!loadingApplications && filteredApplications.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="empty-state">
+                    <td colSpan={6} className="empty-state">
                       No applications found.
                     </td>
                   </tr>
@@ -526,7 +554,7 @@ function App() {
 
                 {loadingApplications && (
                   <tr>
-                    <td colSpan={5} className="empty-state">
+                    <td colSpan={6} className="empty-state">
                       Loading applications...
                     </td>
                   </tr>
