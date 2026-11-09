@@ -91,6 +91,7 @@ function App() {
   const [location, setLocation] = useState('Tokyo, Japan')
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
 
   const [salaryMin, setSalaryMin] = useState('')
   const [salaryMax, setSalaryMax] = useState('')
@@ -275,11 +276,17 @@ function App() {
     }
   }
 
-  const filteredApplications = applications.filter((application) =>
-    `${application.company} ${application.position} ${application.location ?? ''}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  )
+  const filteredApplications = applications.filter((application) => {
+    const matchesSearch =
+      `${application.company} ${application.position} ${application.location ?? ''}`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+
+    const matchesStatus =
+      statusFilter === 'All' || application.status === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
 
   const countByStatus = (value: Application['status']) =>
     applications.filter((application) => application.status === value).length
@@ -524,6 +531,19 @@ function App() {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search applications..."
             />
+
+            <select
+              className="filter-select"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="All">All statuses</option>
+              <option value="Saved">Saved</option>
+              <option value="Applied">Applied</option>
+              <option value="Interview">Interview</option>
+              <option value="Offer">Offer</option>
+              <option value="Rejected">Rejected</option>
+            </select>
           </div>
 
           <div className="table-wrapper">
