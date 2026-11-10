@@ -538,3 +538,16 @@ footer span {
 .filter-select:focus {
   border-color: #6366f1;
 }
+
+.job-link {
+  color: #6366f1;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.job-link:hover {
+  color: #4f46e5;
+  text-decoration: underline;
+}

@@ -552,9 +552,11 @@ function App() {
                 <tr>
                   <th>COMPANY</th>
                   <th>POSITION</th>
+                  <th>JOB POSTING</th>
                   <th>LOCATION</th>
                   <th>SALARY</th>
                   <th>DEADLINE</th>
+                  <th>APPLIED</th>
                   <th>STATUS</th>
                   <th>ACTIONS</th>
                 </tr>
@@ -571,6 +573,20 @@ function App() {
                     </td>
 
                     <td>{application.position}</td>
+                    <td>
+                      {application.job_url ? (
+                        <a
+                          href={application.job_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="job-link"
+                        >
+                          View posting ↗
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
                     <td>{application.location || '—'}</td>
                     <td>{formatSalaryRange(application)}</td>
                     <td>
@@ -581,6 +597,12 @@ function App() {
                       ) : (
                         '—'
                       )}
+                    </td>
+
+                    <td>
+                      {application.applied_at
+                        ? formatDeadline(application.applied_at)
+                        : '—'}
                     </td>
 
                     <td>
@@ -608,7 +630,7 @@ function App() {
 
                 {!loadingApplications && filteredApplications.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="empty-state">
+                    <td colSpan={8} className="empty-state">
                       No applications found.
                     </td>
                   </tr>
@@ -616,7 +638,7 @@ function App() {
 
                 {loadingApplications && (
                   <tr>
-                    <td colSpan={7} className="empty-state">
+                    <td colSpan={8} className="empty-state">
                       Loading applications...
                     </td>
                   </tr>
