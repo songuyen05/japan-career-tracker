@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import './App.css'
 import Login from './Login'
 import { apiRequest } from './api'
+import KanbanBoard from './KanbanBoard'
 
 type Application = {
   id: string
@@ -92,6 +93,7 @@ function App() {
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
 
   const [salaryMin, setSalaryMin] = useState('')
   const [salaryMax, setSalaryMax] = useState('')
@@ -236,6 +238,53 @@ function App() {
       resetForm()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save application.')
+    }
+  }
+
+  const handleStatusChange = async (
+    applicationId: string,
+    newStatus: Application['status']
+  ) => {
+    const application = applications.find(
+      (item) => item.id === applicationId
+    )
+
+    if (!application) return
+
+    setError('')
+
+    try {
+      const data = await apiRequest<{ application: Application }>(
+        `/applications/${applicationId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            company: application.company,
+            position: application.position,
+            location: application.location,
+            status: newStatus,
+            salary_min: application.salary_min,
+            salary_max: application.salary_max,
+            salary_currency: application.salary_currency,
+            job_url: application.job_url,
+            deadline: application.deadline,
+            applied_at: application.applied_at,
+            notes: application.notes,
+          }),
+        }
+      )
+
+      setApplications((current) =>
+        current.map((item) =>
+          item.id === applicationId ? data.application : item
+        )
+      )
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to update application status.'
+      )
     }
   }
 
@@ -519,6 +568,25 @@ function App() {
         </section>
 
         <section className="applications-section" id="applications">
+          <div className="view-switcher">
+            <button
+              className={viewMode === 'table' ? 'view-button active' : 'view-button'}
+              onClick={() => setViewMode('table')}
+            >
+              ☷ Table
+            </button>
+
+            <button
+              className={viewMode === 'kanban' ? 'view-button active' : 'view-button'}
+              onClick={() => setViewMode('kanban')}
+            >
+              ▦ Kanban Board
+            </button>
+          </div>
+
+          {viewMode === 'table' ? (
+            <>
+
           <div className="section-heading">
             <div>
               <h2>Recent applications</h2>
@@ -646,6 +714,13 @@ function App() {
               </tbody>
             </table>
           </div>
+            </>
+          ) : (
+            <KanbanBoard
+              applications={applications}
+              onStatusChange={handleStatusChange}
+            />
+          )}
         </section>
 
         <footer>
