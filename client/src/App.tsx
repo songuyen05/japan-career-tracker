@@ -4,6 +4,7 @@ import './App.css'
 import Login from './Login'
 import { apiRequest } from './api'
 import KanbanBoard from './KanbanBoard'
+import AnalyticsDashboard from './AnalyticsDashboard'
 
 type Application = {
   id: string
@@ -93,7 +94,9 @@ function App() {
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
+  const [viewMode, setViewMode] = useState<
+    'table' | 'kanban' | 'analytics'
+  >('table')
 
   const [salaryMin, setSalaryMin] = useState('')
   const [salaryMax, setSalaryMax] = useState('')
@@ -582,6 +585,13 @@ function App() {
             >
               ▦ Kanban Board
             </button>
+
+            <button
+              className={viewMode === 'analytics' ? 'view-button active' : 'view-button'}
+              onClick={() => setViewMode('analytics')}
+            >
+              ◷ Analytics
+            </button>
           </div>
 
           {viewMode === 'table' ? (
@@ -715,11 +725,13 @@ function App() {
             </table>
           </div>
             </>
-          ) : (
+          ) : viewMode === 'kanban' ? (
             <KanbanBoard
               applications={applications}
               onStatusChange={handleStatusChange}
             />
+          ) : (
+            <AnalyticsDashboard applications={applications} />
           )}
         </section>
 
