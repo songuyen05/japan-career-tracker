@@ -1,14 +1,24 @@
+
 import { Router } from "express";
 import pool from "../config/db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
+
 const validCountries = ["US", "JP"];
 
 const validWorkArrangements = [
   "Remote",
   "Hybrid",
   "On-site",
+];
+
+const validStatuses = [
+  "Saved",
+  "Applied",
+  "Interview",
+  "Offer",
+  "Rejected",
 ];
 
 // Require login for every route in this file.
@@ -66,14 +76,6 @@ router.post("/", async (req, res) => {
         message: "Company and position are required.",
       });
     }
-
-    const validStatuses = [
-      "Saved",
-      "Applied",
-      "Interview",
-      "Offer",
-      "Rejected",
-    ];
 
     const applicationStatus = status ?? "Saved";
 
@@ -189,14 +191,6 @@ router.put("/:id", async (req, res) => {
       work_arrangement,
     } = req.body;
 
-    const validStatuses = [
-      "Saved",
-      "Applied",
-      "Interview",
-      "Offer",
-      "Rejected",
-    ];
-
     if (
       (company !== undefined &&
         (typeof company !== "string" || !company.trim())) ||
@@ -217,29 +211,52 @@ router.put("/:id", async (req, res) => {
       });
     }
 
+    if (
+      country !== undefined &&
+      !validCountries.includes(country)
+    ) {
+      return res.status(400).json({
+        message: "Country must be US or JP.",
+      });
+    }
+
+    if (
+      work_arrangement !== undefined &&
+      work_arrangement !== null &&
+      !validWorkArrangements.includes(work_arrangement)
+    ) {
+      return res.status(400).json({
+        message: "Invalid work arrangement.",
+      });
+    }
+
     const result = await pool.query(
       `UPDATE applications SET
         company = COALESCE($1, company),
         position = COALESCE($2, position),
         location = COALESCE($3, location),
         country = COALESCE($4, country),
-        work_arrangement = $5,
-        salary_min = COALESCE($6, salary_min),
-        salary_max = COALESCE($7, salary_max),
-        salary_currency = COALESCE($8, salary_currency),
-        job_url = COALESCE($9, job_url),
-        status = COALESCE($10, status),
-        deadline = COALESCE($11, deadline),
-        applied_at = COALESCE($12, applied_at),
-        notes = COALESCE($13, notes),
+        work_arrangement = CASE
+          WHEN $5::boolean THEN $6
+          ELSE work_arrangement
+        END,
+        salary_min = COALESCE($7, salary_min),
+        salary_max = COALESCE($8, salary_max),
+        salary_currency = COALESCE($9, salary_currency),
+        job_url = COALESCE($10, job_url),
+        status = COALESCE($11, status),
+        deadline = COALESCE($12, deadline),
+        applied_at = COALESCE($13, applied_at),
+        notes = COALESCE($14, notes),
         updated_at = NOW()
-      WHERE id = $14 AND user_id = $15
+      WHERE id = $15 AND user_id = $16
       RETURNING *`,
       [
         company?.trim(),
         position?.trim(),
         location,
         country,
+        work_arrangement !== undefined,
         work_arrangement ?? null,
         salary_min,
         salary_max,

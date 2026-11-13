@@ -2,6 +2,19 @@ import { Router } from "express";
 import pool from "../config/db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 const router = Router();
+const validCountries = ["US", "JP"];
+const validWorkArrangements = [
+    "Remote",
+    "Hybrid",
+    "On-site",
+];
+const validStatuses = [
+    "Saved",
+    "Applied",
+    "Interview",
+    "Offer",
+    "Rejected",
+];
 // Require login for every route in this file.
 router.use(requireAuth);
 // GET ALL APPLICATIONS
@@ -25,7 +38,7 @@ router.get("/", async (req, res) => {
 // CREATE APPLICATION
 router.post("/", async (req, res) => {
     try {
-        const { company, position, location, salary_min, salary_max, salary_currency, job_url, status, deadline, applied_at, notes, } = req.body;
+        const { company, position, location, salary_min, salary_max, salary_currency, job_url, status, deadline, applied_at, notes, country, work_arrangement, } = req.body;
         if (typeof company !== "string" ||
             !company.trim() ||
             typeof position !== "string" ||
@@ -34,35 +47,43 @@ router.post("/", async (req, res) => {
                 message: "Company and position are required.",
             });
         }
-        const validStatuses = [
-            "Saved",
-            "Applied",
-            "Interview",
-            "Offer",
-            "Rejected",
-        ];
         const applicationStatus = status ?? "Saved";
         if (!validStatuses.includes(applicationStatus)) {
             return res.status(400).json({
                 message: "Invalid application status.",
             });
         }
+        const applicationCountry = country ?? "US";
+        if (!validCountries.includes(applicationCountry)) {
+            return res.status(400).json({
+                message: "Country must be US or JP.",
+            });
+        }
+        if (work_arrangement != null &&
+            !validWorkArrangements.includes(work_arrangement)) {
+            return res.status(400).json({
+                message: "Invalid work arrangement.",
+            });
+        }
         const result = await pool.query(`INSERT INTO applications (
         user_id, company, position, location,
+        country, work_arrangement,
         salary_min, salary_max, salary_currency,
         job_url, status, deadline, applied_at, notes
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
       )
       RETURNING *`, [
             req.session.userId,
             company.trim(),
             position.trim(),
             location ?? null,
+            applicationCountry,
+            work_arrangement ?? null,
             salary_min ?? null,
             salary_max ?? null,
-            salary_currency ?? "JPY",
+            salary_currency ?? (applicationCountry === "JP" ? "JPY" : "USD"),
             job_url ?? null,
             applicationStatus,
             deadline ?? null,
@@ -106,14 +127,7 @@ router.get("/:id", async (req, res) => {
 // UPDATE APPLICATION
 router.put("/:id", async (req, res) => {
     try {
-        const { company, position, location, salary_min, salary_max, salary_currency, job_url, status, deadline, applied_at, notes, } = req.body;
-        const validStatuses = [
-            "Saved",
-            "Applied",
-            "Interview",
-            "Offer",
-            "Rejected",
-        ];
+        const { company, position, location, salary_min, salary_max, salary_currency, job_url, status, deadline, applied_at, notes, country, work_arrangement, } = req.body;
         if ((company !== undefined &&
             (typeof company !== "string" || !company.trim())) ||
             (position !== undefined &&
@@ -128,24 +142,45 @@ router.put("/:id", async (req, res) => {
                 message: "Invalid application status.",
             });
         }
+        if (country !== undefined &&
+            !validCountries.includes(country)) {
+            return res.status(400).json({
+                message: "Country must be US or JP.",
+            });
+        }
+        if (work_arrangement !== undefined &&
+            work_arrangement !== null &&
+            !validWorkArrangements.includes(work_arrangement)) {
+            return res.status(400).json({
+                message: "Invalid work arrangement.",
+            });
+        }
         const result = await pool.query(`UPDATE applications SET
         company = COALESCE($1, company),
         position = COALESCE($2, position),
         location = COALESCE($3, location),
-        salary_min = COALESCE($4, salary_min),
-        salary_max = COALESCE($5, salary_max),
-        salary_currency = COALESCE($6, salary_currency),
-        job_url = COALESCE($7, job_url),
-        status = COALESCE($8, status),
-        deadline = COALESCE($9, deadline),
-        applied_at = COALESCE($10, applied_at),
-        notes = COALESCE($11, notes),
+        country = COALESCE($4, country),
+        work_arrangement = CASE
+          WHEN $5::boolean THEN $6
+          ELSE work_arrangement
+        END,
+        salary_min = COALESCE($7, salary_min),
+        salary_max = COALESCE($8, salary_max),
+        salary_currency = COALESCE($9, salary_currency),
+        job_url = COALESCE($10, job_url),
+        status = COALESCE($11, status),
+        deadline = COALESCE($12, deadline),
+        applied_at = COALESCE($13, applied_at),
+        notes = COALESCE($14, notes),
         updated_at = NOW()
-      WHERE id = $12 AND user_id = $13
+      WHERE id = $15 AND user_id = $16
       RETURNING *`, [
             company?.trim(),
             position?.trim(),
             location,
+            country,
+            work_arrangement !== undefined,
+            work_arrangement ?? null,
             salary_min,
             salary_max,
             salary_currency,
