@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import app from "./app.js";
 
-
 const testEmail = `automated-${Date.now()}@example.com`;
 const testPassword = "TestPassword123!";
 
@@ -164,7 +163,6 @@ describe("User Login", () => {
   });
 });
 
-
 const userAEmail = `crud-user-a-${Date.now()}@example.com`;
 const userBEmail = `crud-user-b-${Date.now()}@example.com`;
 
@@ -211,6 +209,60 @@ describe("Job Application CRUD", () => {
     expect(response.body.application.position).toBe("Software Engineer");
     expect(response.body.application.status).toBe("Applied");
     expect(Number(response.body.application.salary_min)).toBe(5000000);
+  });
+
+  it("should default a Japanese application to JPY", async () => {
+    const response = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Nintendo",
+        position: "Software Engineer",
+        country: "JP",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.application.country).toBe("JP");
+    expect(response.body.application.salary_currency).toBe("JPY");
+  });
+
+  it("should default a US application to USD", async () => {
+    const response = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Google",
+        position: "Software Engineer",
+        country: "US",
+      });
+
+    expect(response.status).toBe(201);
+    expect(response.body.application.country).toBe("US");
+    expect(response.body.application.salary_currency).toBe("USD");
+  });
+
+  it("should reject an invalid country", async () => {
+    const response = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Invalid Company",
+        position: "Software Engineer",
+        country: "CA",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Country must be US or JP.");
+  });
+
+  it("should reject an invalid work arrangement", async () => {
+    const response = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Invalid Company",
+        position: "Software Engineer",
+        work_arrangement: "Flexible",
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.message).toBe("Invalid work arrangement.");
   });
 
   it("should reject applications with missing company or position", async () => {
@@ -303,6 +355,48 @@ describe("Job Application CRUD", () => {
       "Senior Software Engineer"
     );
     expect(response.body.application.status).toBe("Interview");
+  });
+
+  it("should preserve work arrangement when it is not included in an update", async () => {
+    const createResponse = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Microsoft",
+        position: "Software Engineer",
+        work_arrangement: "Hybrid",
+      });
+
+    const applicationId = createResponse.body.application.id;
+
+    const response = await userAClient
+      .put(`/api/applications/${applicationId}`)
+      .send({
+        position: "Senior Software Engineer",
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.application.work_arrangement).toBe("Hybrid");
+  });
+
+  it("should allow clearing an existing work arrangement", async () => {
+    const createResponse = await userAClient
+      .post("/api/applications")
+      .send({
+        company: "Apple",
+        position: "Software Engineer",
+        work_arrangement: "On-site",
+      });
+
+    const applicationId = createResponse.body.application.id;
+
+    const response = await userAClient
+      .put(`/api/applications/${applicationId}`)
+      .send({
+        work_arrangement: null,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.application.work_arrangement).toBeNull();
   });
 
   it("should prevent another user from accessing an application", async () => {
