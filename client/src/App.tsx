@@ -6,11 +6,16 @@ import { apiRequest } from './api'
 import KanbanBoard from './KanbanBoard'
 import AnalyticsDashboard from './AnalyticsDashboard'
 
+type Country = 'US' | 'JP'
+type WorkArrangement = 'Remote' | 'Hybrid' | 'On-site'
+
 type Application = {
   id: string
   company: string
   position: string
   location: string | null
+  country: Country
+  work_arrangement: WorkArrangement | null
   status: 'Saved' | 'Applied' | 'Interview' | 'Offer' | 'Rejected'
   salary_min: number | string | null
   salary_max: number | string | null
@@ -90,7 +95,9 @@ function App() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [company, setCompany] = useState('')
   const [position, setPosition] = useState('')
-  const [location, setLocation] = useState('Tokyo, Japan')
+  const [location, setLocation] = useState('')
+  const [country, setCountry] = useState<Country>('US')
+  const [workArrangement, setWorkArrangement] = useState<WorkArrangement | ''>('')
   const [status, setStatus] = useState<Application['status']>('Saved')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -100,7 +107,7 @@ function App() {
 
   const [salaryMin, setSalaryMin] = useState('')
   const [salaryMax, setSalaryMax] = useState('')
-  const [salaryCurrency, setSalaryCurrency] = useState('JPY')
+  const salaryCurrency = country === 'JP' ? 'JPY' : 'USD'
   const [jobUrl, setJobUrl] = useState('')
   const [deadline, setDeadline] = useState('')
   const [appliedAt, setAppliedAt] = useState('')
@@ -156,13 +163,14 @@ function App() {
   const resetForm = () => {
     setCompany('')
     setPosition('')
-    setLocation('Tokyo, Japan')
+    setLocation('')
+    setCountry('US')
+    setWorkArrangement('')
     setStatus('Saved')
     setEditingId(null)
     setShowForm(false)
     setSalaryMin('')
     setSalaryMax('')
-    setSalaryCurrency('JPY')
     setJobUrl('')
     setDeadline('')
     setAppliedAt('')
@@ -178,12 +186,13 @@ function App() {
     setCompany(application.company)
     setPosition(application.position)
     setLocation(application.location ?? '')
+    setCountry(application.country)
+    setWorkArrangement(application.work_arrangement ?? '')
     setStatus(application.status)
     setEditingId(application.id)
     setShowForm(true)
     setSalaryMin(application.salary_min?.toString() ?? '')
     setSalaryMax(application.salary_max?.toString() ?? '')
-    setSalaryCurrency(application.salary_currency || 'JPY')
     setJobUrl(application.job_url ?? '')
     setDeadline(application.deadline?.slice(0, 10) ?? '')
     setAppliedAt(application.applied_at?.slice(0, 10) ?? '')
@@ -201,6 +210,8 @@ function App() {
       company: company.trim(),
       position: position.trim(),
       location: location.trim() || null,
+      country,
+      work_arrangement: workArrangement || null,
       status,
       salary_min: salaryMin ? Number(salaryMin) : null,
       salary_max: salaryMax ? Number(salaryMax) : null,
@@ -265,6 +276,8 @@ function App() {
             company: application.company,
             position: application.position,
             location: application.location,
+            country: application.country,
+            work_arrangement: application.work_arrangement,
             status: newStatus,
             salary_min: application.salary_min,
             salary_max: application.salary_max,
@@ -330,7 +343,9 @@ function App() {
 
   const filteredApplications = applications.filter((application) => {
     const matchesSearch =
-      `${application.company} ${application.position} ${application.location ?? ''}`
+      `${application.company} ${application.position} ${application.location ?? ''} ${
+        application.country === 'JP' ? 'Japan' : 'United States'
+      } ${application.work_arrangement ?? ''}`
         .toLowerCase()
         .includes(search.toLowerCase())
 
@@ -444,6 +459,32 @@ function App() {
               </label>
 
               <label>
+                Country
+                <select
+                  value={country}
+                  onChange={(event) => setCountry(event.target.value as Country)}
+                >
+                  <option value="US">United States</option>
+                  <option value="JP">Japan</option>
+                </select>
+              </label>
+
+              <label>
+                Work arrangement
+                <select
+                  value={workArrangement}
+                  onChange={(event) =>
+                    setWorkArrangement(event.target.value as WorkArrangement | '')
+                  }
+                >
+                  <option value="">Not specified</option>
+                  <option value="Remote">Remote</option>
+                  <option value="Hybrid">Hybrid</option>
+                  <option value="On-site">On-site</option>
+                </select>
+              </label>
+
+              <label>
                 Status
                 <select
                   value={status}
@@ -483,14 +524,10 @@ function App() {
 
               <label>
                 Salary currency
-                <select
-                  value={salaryCurrency}
-                  onChange={(event) => setSalaryCurrency(event.target.value)}
-                >
-                  <option value="JPY">JPY (¥)</option>
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                </select>
+                <input
+                  value={country === 'JP' ? 'JPY (¥)' : 'USD ($)'}
+                  disabled
+                />
               </label>
 
               <label>
@@ -632,6 +669,8 @@ function App() {
                   <th>POSITION</th>
                   <th>JOB POSTING</th>
                   <th>LOCATION</th>
+                  <th>COUNTRY</th>
+                  <th>WORK ARRANGEMENT</th>
                   <th>SALARY</th>
                   <th>DEADLINE</th>
                   <th>APPLIED</th>
@@ -666,6 +705,8 @@ function App() {
                       )}
                     </td>
                     <td>{application.location || '—'}</td>
+                    <td>{application.country === 'JP' ? 'Japan' : 'United States'}</td>
+                    <td>{application.work_arrangement || '—'}</td>
                     <td>{formatSalaryRange(application)}</td>
                     <td>
                       {application.deadline ? (
@@ -708,7 +749,7 @@ function App() {
 
                 {!loadingApplications && filteredApplications.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="empty-state">
+                    <td colSpan={11} className="empty-state">
                       No applications found.
                     </td>
                   </tr>
@@ -716,7 +757,7 @@ function App() {
 
                 {loadingApplications && (
                   <tr>
-                    <td colSpan={8} className="empty-state">
+                    <td colSpan={11} className="empty-state">
                       Loading applications...
                     </td>
                   </tr>
