@@ -3,6 +3,13 @@ import pool from "../config/db.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 
 const router = Router();
+const validCountries = ["US", "JP"];
+
+const validWorkArrangements = [
+  "Remote",
+  "Hybrid",
+  "On-site",
+];
 
 // Require login for every route in this file.
 router.use(requireAuth);
@@ -45,6 +52,8 @@ router.post("/", async (req, res) => {
       deadline,
       applied_at,
       notes,
+      country,
+      work_arrangement,
     } = req.body;
 
     if (
@@ -74,14 +83,32 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const applicationCountry = country ?? "US";
+
+    if (!validCountries.includes(applicationCountry)) {
+      return res.status(400).json({
+        message: "Country must be US or JP.",
+      });
+    }
+
+    if (
+      work_arrangement != null &&
+      !validWorkArrangements.includes(work_arrangement)
+    ) {
+      return res.status(400).json({
+        message: "Invalid work arrangement.",
+      });
+    }
+
     const result = await pool.query(
       `INSERT INTO applications (
         user_id, company, position, location,
+        country, work_arrangement,
         salary_min, salary_max, salary_currency,
         job_url, status, deadline, applied_at, notes
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14
       )
       RETURNING *`,
       [
@@ -89,9 +116,11 @@ router.post("/", async (req, res) => {
         company.trim(),
         position.trim(),
         location ?? null,
+        applicationCountry,
+        work_arrangement ?? null,
         salary_min ?? null,
         salary_max ?? null,
-        salary_currency ?? "JPY",
+        salary_currency ?? (applicationCountry === "JP" ? "JPY" : "USD"),
         job_url ?? null,
         applicationStatus,
         deadline ?? null,
