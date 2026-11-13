@@ -185,6 +185,8 @@ router.put("/:id", async (req, res) => {
       deadline,
       applied_at,
       notes,
+      country,
+      work_arrangement,
     } = req.body;
 
     const validStatuses = [
@@ -220,21 +222,25 @@ router.put("/:id", async (req, res) => {
         company = COALESCE($1, company),
         position = COALESCE($2, position),
         location = COALESCE($3, location),
-        salary_min = COALESCE($4, salary_min),
-        salary_max = COALESCE($5, salary_max),
-        salary_currency = COALESCE($6, salary_currency),
-        job_url = COALESCE($7, job_url),
-        status = COALESCE($8, status),
-        deadline = COALESCE($9, deadline),
-        applied_at = COALESCE($10, applied_at),
-        notes = COALESCE($11, notes),
+        country = COALESCE($4, country),
+        work_arrangement = $5,
+        salary_min = COALESCE($6, salary_min),
+        salary_max = COALESCE($7, salary_max),
+        salary_currency = COALESCE($8, salary_currency),
+        job_url = COALESCE($9, job_url),
+        status = COALESCE($10, status),
+        deadline = COALESCE($11, deadline),
+        applied_at = COALESCE($12, applied_at),
+        notes = COALESCE($13, notes),
         updated_at = NOW()
-      WHERE id = $12 AND user_id = $13
+      WHERE id = $14 AND user_id = $15
       RETURNING *`,
       [
         company?.trim(),
         position?.trim(),
         location,
+        country,
+        work_arrangement ?? null,
         salary_min,
         salary_max,
         salary_currency,
